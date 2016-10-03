@@ -33,9 +33,6 @@ class hazptr_rec;
 struct hazptr_obj;
 template <typename T, typename Deleter> class hazptr_obj_base;
 
-/** Alias for object reclamation function template */
-template <typename T> using hazptr_obj_reclaim = std::function<void(T*)>;
-
 /** hazptr_domain: Class of hazard pointer domains. Each domain manages a set
  *  of hazard pointers and a set of retired objects. */
 class hazptr_domain {
@@ -49,9 +46,6 @@ class hazptr_domain {
   hazptr_domain& operator=(const hazptr_domain&) = delete;
   hazptr_domain& operator=(hazptr_domain&&) = delete;
 
-  /* Reclaim all retired objects with a specific reclamation
-   * function currently stored by this domain */
-  template <typename T> void flush(const hazptr_obj_reclaim<T>* reclaim);
   /* Reclaim all retired objects currently stored by this domain  */
   void flush();
 
@@ -74,14 +68,10 @@ class hazptr_domain {
   template <typename T, typename D> void objRetire(hazptr_obj_base<T,D>* p);
   int pushRetired(hazptr_obj* head, hazptr_obj* tail, int count);
   void bulkReclaim();
-  void flush(const hazptr_obj_reclaim<void>* reclaim);
 };
 
 /** Get the default hazptr_domain */
 hazptr_domain* default_hazptr_domain();
-
-/** Declaration of default reclamation function template */
-template <typename T> hazptr_obj_reclaim<T>* default_hazptr_obj_reclaim();
 
 /** Definition of hazptr_obj_base */
 struct hazptr_obj {

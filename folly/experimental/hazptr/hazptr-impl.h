@@ -31,12 +31,6 @@ namespace hazptr {
 constexpr hazptr_domain::hazptr_domain(memory_resource* mr) noexcept
     : mr_(mr) {}
 
-template <typename T>
-void hazptr_domain::flush(const hazptr_obj_reclaim<T>* reclaim) {
-  DEBUG_PRINT(this << " " << reclaim);
-  flush(reinterpret_cast<const hazptr_obj_reclaim<void>*>(reclaim));
-}
-
 template <typename T, typename D>
 inline void hazptr_domain::objRetire(hazptr_obj_base<T,D>* p) {
   DEBUG_PRINT(this << " " << p);
@@ -58,18 +52,6 @@ inline void hazptr_obj_base<T,D>::retire(
     hobp->deleter_(obj);
   };
   domain->objRetire<T>(this);
-}
-
-/* Definition of default_hazptr_obj_reclaim */
-
-template <typename T>
-inline hazptr_obj_reclaim<T>* default_hazptr_obj_reclaim() {
-  static hazptr_obj_reclaim<T> fn = [](T* p) {
-    DEBUG_PRINT("default_hazptr_obj_reclaim " << p << " " << sizeof(T));
-    delete p;
-  };
-  DEBUG_PRINT(&fn);
-  return &fn;
 }
 
 /** hazptr_rec */
@@ -298,33 +280,6 @@ inline void hazptr_domain::bulkReclaim() {
     pushRetired(retired, tail, rcount);
   }
 }
-
-#if 0
-inline void hazptr_domain::flush(const hazptr_obj_reclaim<void>* reclaim) {
-  DEBUG_PRINT(this << " " << reclaim);
-  auto rcount = rcount_.exchange(0);
-  auto p = retired_.exchange(nullptr);
-  hazptr_obj* retired = nullptr;
-  hazptr_obj* tail = nullptr;
-  hazptr_obj* next;
-  for (; p; p = next) {
-    next = p->next_;
-    if (p->reclaim_ == reclaim) {
-      (*reclaim)(p);
-    } else {
-      p->next_ = retired;
-      retired = p;
-      if (tail == nullptr) {
-        tail = p;
-      }
-      ++rcount;
-    }
-  }
-  if (tail) {
-    pushRetired(retired, tail, rcount);
-  }
-}
-#endif
 
 /** hazptr_user */
 
