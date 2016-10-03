@@ -29,7 +29,16 @@ namespace hazptr {
  */
 template <typename T>
 class SWMRListSet {
-  class Node : public hazptr_obj_base<Node> {
+
+  template<class Node>
+  struct Reclaimer {
+    void operator()(Node *p) const {
+      DEBUG_PRINT(p << " " << sizeof(Node));
+      delete p;
+    }
+  };
+
+  class Node : public hazptr_obj_base<Node, Reclaimer<Node>> {
     friend SWMRListSet;
     T elem_;
     std::atomic<Node*> next_;
@@ -46,12 +55,6 @@ class SWMRListSet {
 
   std::atomic<Node*> head_ = {nullptr};
   hazptr_domain* domain_;
-  hazptr_obj_reclaim<Node> reclaim_ = [](Node* p) { reclaim(p); };
-
-  static void reclaim(Node* p) {
-    DEBUG_PRINT(p << " " << sizeof(Node));
-    delete p;
-  };
 
   /* Used by the single writer */
   void locate_lower_bound(T v, std::atomic<Node*>*& prev) {
@@ -74,7 +77,7 @@ class SWMRListSet {
       next = p->next_.load();
       delete p;
     }
-    domain_->flush(&reclaim_); /* avoid destruction order fiasco */
+    domain_->flush(); /* avoid destruction order fiasco */
   }
 
   bool add(T v) {
@@ -92,7 +95,7 @@ class SWMRListSet {
     auto curr = prev->load();
     if (!curr || curr->elem_ != v) return false;
     prev->store(curr->next_.load());
-    curr->retire(domain_, &reclaim_);
+    curr->retire(domain_);
     return true;
   }
   /* Used by readers */

@@ -28,14 +28,6 @@
 
 using namespace folly::hazptr;
 
-static hazptr_obj_reclaim<Node1> myReclaim_ = [](Node1* p) {
-  myReclaimFn(p);
-};
-
-static hazptr_obj_reclaim<Node2> mineReclaim_ = [](Node2* p) {
-  mineReclaimFn(p);
-};
-
 TEST(Hazptr, Test1) {
   DEBUG_PRINT("========== start of scope");
   DEBUG_PRINT("");
@@ -94,11 +86,11 @@ TEST(Hazptr, Test1) {
   n0->retire();
   DEBUG_PRINT("=== retire n1 " << n1);
 
-  n1->retire(default_hazptr_domain(), &myReclaim_);
+  n1->retire(default_hazptr_domain());
   DEBUG_PRINT("=== retire n2 " << n2);
-  n2->retire(&myDomain0, &myReclaim_);
+  n2->retire(&myDomain0);
   DEBUG_PRINT("=== retire n3 " << n3);
-  n3->retire(&myDomain1, &myReclaim_);
+  n3->retire(&myDomain1);
 
   DEBUG_PRINT("========== end of scope");
 }
@@ -160,11 +152,11 @@ TEST(Hazptr, Test2) {
   n0->retire();
   DEBUG_PRINT("=== retire n1 " << n1);
 
-  n1->retire(default_hazptr_domain(), &mineReclaim_);
+  n1->retire(default_hazptr_domain(), &mineReclaimFn);
   DEBUG_PRINT("=== retire n2 " << n2);
-  n2->retire(&mineDomain0, &mineReclaim_);
+  n2->retire(&mineDomain0, &mineReclaimFn);
   DEBUG_PRINT("=== retire n3 " << n3);
-  n3->retire(&mineDomain1, &mineReclaim_);
+  n3->retire(&mineDomain1, &mineReclaimFn);
 
   DEBUG_PRINT("========== end of scope");
 }

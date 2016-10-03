@@ -30,7 +30,8 @@ namespace hazptr {
 class hazptr_rec;
 
 /** hazptr_obj_base: Base template for objects protected by hazard pointers. */
-template <typename T> class hazptr_obj_base;
+struct hazptr_obj;
+template <typename T, typename Deleter> class hazptr_obj_base;
 
 /** Alias for object reclamation function template */
 template <typename T> using hazptr_obj_reclaim = std::function<void(T*)>;
@@ -55,10 +56,8 @@ class hazptr_domain {
   void flush();
 
  private:
-  template <typename> friend class hazptr_obj_base;
+  template <typename, typename> friend class hazptr_obj_base;
   template <typename> friend class hazptr_owner;
-
-  using hazptr_obj = hazptr_obj_base<void>;
 
   /** Constant -- May be changed to parameter in the future */
   enum { kScanThreshold = 3 };
@@ -69,10 +68,10 @@ class hazptr_domain {
   std::atomic<int> hcount_ = {0};
   std::atomic<int> rcount_ = {0};
 
-  template <typename T> void objRetire(hazptr_obj_base<T>*);
+  void objRetire(hazptr_obj*);
   hazptr_rec* hazptrAcquire();
   void hazptrRelease(hazptr_rec*) const noexcept;
-  void objRetire(hazptr_obj*);
+  template <typename T, typename D> void objRetire(hazptr_obj_base<T,D>* p);
   int pushRetired(hazptr_obj* head, hazptr_obj* tail, int count);
   void bulkReclaim();
   void flush(const hazptr_obj_reclaim<void>* reclaim);
@@ -85,7 +84,13 @@ hazptr_domain* default_hazptr_domain();
 template <typename T> hazptr_obj_reclaim<T>* default_hazptr_obj_reclaim();
 
 /** Definition of hazptr_obj_base */
-template <typename T> class hazptr_obj_base {
+struct hazptr_obj {
+  void (*reclaim_)(hazptr_obj *);
+  hazptr_obj* next_;
+};
+
+template <typename T, typename Deleter = std::default_delete<T> >
+class hazptr_obj_base : public hazptr_obj {
  public:
   /* Policy for storing retired objects */
   enum class storage_policy { priv, shared };
@@ -94,15 +99,14 @@ template <typename T> class hazptr_obj_base {
    * reclaiming it to the hazptr library */
   void retire(
       hazptr_domain* domain = default_hazptr_domain(),
-      const hazptr_obj_reclaim<T>* reclaim = default_hazptr_obj_reclaim<T>(),
+      Deleter reclaim = {},
       const storage_policy policy = storage_policy::shared);
 
  private:
   friend class hazptr_domain;
   template <typename> friend class hazptr_owner;
 
-  const hazptr_obj_reclaim<T>* reclaim_;
-  hazptr_obj_base* next_;
+  Deleter deleter_;
 };
 
 /** hazptr_owner: Template for automatic acquisition and release of

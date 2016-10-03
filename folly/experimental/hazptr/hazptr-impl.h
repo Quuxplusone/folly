@@ -37,21 +37,26 @@ void hazptr_domain::flush(const hazptr_obj_reclaim<T>* reclaim) {
   flush(reinterpret_cast<const hazptr_obj_reclaim<void>*>(reclaim));
 }
 
-template <typename T>
-inline void hazptr_domain::objRetire(hazptr_obj_base<T>* p) {
+template <typename T, typename D>
+inline void hazptr_domain::objRetire(hazptr_obj_base<T,D>* p) {
   DEBUG_PRINT(this << " " << p);
-  objRetire(reinterpret_cast<hazptr_obj_base<void>*>(p));
+  objRetire(static_cast<hazptr_obj*>(p));
 }
 
 /** hazptr_obj_base */
 
-template <typename T>
-inline void hazptr_obj_base<T>::retire(
+template <typename T, typename D>
+inline void hazptr_obj_base<T,D>::retire(
     hazptr_domain* domain,
-    const hazptr_obj_reclaim<T>* reclaim,
+    D deleter,
     const storage_policy /* policy */) {
-  DEBUG_PRINT(this << " " << reclaim << " " << &domain);
-  reclaim_ = reclaim;
+  DEBUG_PRINT(this << " " << &domain);
+  deleter_ = std::move(deleter);
+  reclaim_ = [](hazptr_obj* p) {
+    auto hobp = static_cast<hazptr_obj_base*>(p);
+    auto obj = static_cast<T*>(hobp);
+    hobp->deleter_(obj);
+  };
   domain->objRetire<T>(this);
 }
 
@@ -294,6 +299,7 @@ inline void hazptr_domain::bulkReclaim() {
   }
 }
 
+#if 0
 inline void hazptr_domain::flush(const hazptr_obj_reclaim<void>* reclaim) {
   DEBUG_PRINT(this << " " << reclaim);
   auto rcount = rcount_.exchange(0);
@@ -318,6 +324,7 @@ inline void hazptr_domain::flush(const hazptr_obj_reclaim<void>* reclaim) {
     pushRetired(retired, tail, rcount);
   }
 }
+#endif
 
 /** hazptr_user */
 

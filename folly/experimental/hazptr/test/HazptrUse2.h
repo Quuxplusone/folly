@@ -35,7 +35,7 @@ class MineMemoryResource : public memory_resource {
   }
 };
 
-class Node2 : public hazptr_obj_base<Node2> {
+class Node2 : public hazptr_obj_base<Node2, void(*)(Node2*)> {
   char a[200];
 };
 
