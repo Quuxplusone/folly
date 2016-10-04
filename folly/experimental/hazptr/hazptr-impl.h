@@ -31,12 +31,6 @@ namespace hazptr {
 constexpr hazptr_domain::hazptr_domain(memory_resource* mr) noexcept
     : mr_(mr) {}
 
-template <typename T, typename D>
-inline void hazptr_domain::objRetire(hazptr_obj_base<T,D>* p) {
-  DEBUG_PRINT(this << " " << p);
-  objRetire(static_cast<hazptr_obj*>(p));
-}
-
 /** hazptr_obj_base */
 
 template <typename T, typename D>
@@ -51,7 +45,7 @@ inline void hazptr_obj_base<T,D>::retire(
     auto obj = static_cast<T*>(hobp);
     hobp->deleter_(obj);
   };
-  domain->objRetire<T>(this);
+  domain->objRetire(this);
 }
 
 /** hazptr_rec */
@@ -265,7 +259,7 @@ inline void hazptr_domain::bulkReclaim() {
   hazptr_obj* next;
   for (; p; p = next) {
     next = p->next_;
-    if (hs.count(p) == 0) {
+    if (hs.count(p->get_data_pointer_()) == 0) {
       (*(p->reclaim_))(p);
     } else {
       p->next_ = retired;

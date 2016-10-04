@@ -65,7 +65,6 @@ class hazptr_domain {
   void objRetire(hazptr_obj*);
   hazptr_rec* hazptrAcquire();
   void hazptrRelease(hazptr_rec*) const noexcept;
-  template <typename T, typename D> void objRetire(hazptr_obj_base<T,D>* p);
   int pushRetired(hazptr_obj* head, hazptr_obj* tail, int count);
   void bulkReclaim();
 };
@@ -77,10 +76,11 @@ hazptr_domain* default_hazptr_domain();
 struct hazptr_obj {
   void (*reclaim_)(hazptr_obj *);
   hazptr_obj* next_;
+  const void* get_data_pointer_() const { return this; }
 };
 
 template <typename T, typename Deleter = std::default_delete<T> >
-class hazptr_obj_base : public hazptr_obj {
+class hazptr_obj_base : private hazptr_obj {
  public:
   /* Policy for storing retired objects */
   enum class storage_policy { priv, shared };
@@ -93,9 +93,6 @@ class hazptr_obj_base : public hazptr_obj {
       const storage_policy policy = storage_policy::shared);
 
  private:
-  friend class hazptr_domain;
-  template <typename> friend class hazptr_owner;
-
   Deleter deleter_;
 };
 
