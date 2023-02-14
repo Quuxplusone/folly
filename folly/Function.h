@@ -587,6 +587,26 @@ struct DispatchSmallTrivial {
   static constexpr auto exec = exec_<size_<sizeof(Fun)>>;
 };
 
+struct DispatchSmallTR {
+  template <typename Fun, typename Base>
+  static constexpr auto call = Base::template callSmall<Fun>;
+
+  template <typename Fun>
+  static std::size_t exec(Op o, Data* src, Data* dst) noexcept {
+    switch (o) {
+      case Op::MOVE:
+        std::memcpy(static_cast<void*>(dst), static_cast<void*>(src), Size);
+        break;
+      case Op::NUKE:
+        static_cast<Fun*>(static_cast<void*>(&src->tiny))->~Fun();
+        break;
+      case Op::HEAP:
+        break;
+    }
+    return 0U;
+  }
+};
+
 struct DispatchSmall {
   template <typename Fun, typename Base>
   static constexpr auto call = Base::template callSmall<Fun>;
@@ -750,9 +770,12 @@ class Function final : private detail::function::FunctionTraits<FunctionType> {
         IsSmall && is_trivially_copyable_v<Fun>,
         detail::function::DispatchSmallTrivial,
         conditional_t<
-            IsSmall,
-            detail::function::DispatchSmall,
-            detail::function::DispatchBig>>;
+            IsSmall && folly::IsRelocatable<Fun>::value,
+            detail::function::DispatchSmallTR,
+            conditional_t<
+                IsSmall,
+                detail::function::DispatchSmall,
+                detail::function::DispatchBig>>>;
     if FOLLY_CXX17_CONSTEXPR (detail::function::IsNullptrCompatible<Fun>) {
       if (detail::function::isEmptyFunction(fun)) {
         return;

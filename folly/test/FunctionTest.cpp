@@ -21,6 +21,7 @@
 #include <functional>
 
 #include <folly/Memory.h>
+#include <folly/Traits.h>
 #include <folly/lang/Keep.h>
 #include <folly/portability/GTest.h>
 
@@ -1424,4 +1425,48 @@ TEST(Function, TrivialSmallBig) {
   EXPECT_EQ(7, t2());
   EXPECT_EQ(7, s2());
   EXPECT_EQ(7, h2());
+}
+
+struct TrivialByWarrant {
+  static int moveConstructions;
+  static int destructions;
+  explicit TrivialByWarrant(int *p) : p_(p) {}
+  TrivialByWarrant(TrivialByWarrant&& rhs) :
+    p_(std::exchange(rhs.p_, nullptr)) {
+    moveConstructions += 1;
+  }
+  ~TrivialByWarrant() {
+    destructions += 1;
+  }
+  int operator()() const { return *p_; }
+private:
+  int *p_ = nullptr;
+};
+int TrivialByWarrant::moveConstructions = 0;
+int TrivialByWarrant::destructions = 0;
+FOLLY_ASSUME_FBVECTOR_COMPATIBLE(TrivialByWarrant);
+
+TEST(Function, UseMemcpyForTriviallyRelocatableTypes) {
+  int i = 42;
+  auto t = TrivialByWarrant(&i);
+  static_assert(folly::IsRelocatable<decltype(t)>::value);
+
+  TrivialByWarrant::moveConstructions = 0;
+  TrivialByWarrant::destructions = 0;
+  {
+    Function<int()> f(std::move(t));
+
+    EXPECT_EQ(TrivialByWarrant::moveConstructions, 1); // into f
+    EXPECT_EQ(TrivialByWarrant::destructions, 0);
+    EXPECT_EQ(f(), 42);
+    {
+      Function<int()> g = std::move(f);
+
+      EXPECT_EQ(TrivialByWarrant::moveConstructions, 1);
+      EXPECT_EQ(TrivialByWarrant::destructions, 0);
+      EXPECT_EQ(g(), 42);
+    }
+    EXPECT_EQ(TrivialByWarrant::destructions, 1); // from g
+  }
+  EXPECT_EQ(TrivialByWarrant::destructions, 1);
 }
